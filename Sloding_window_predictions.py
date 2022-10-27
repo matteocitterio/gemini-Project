@@ -27,9 +27,14 @@ import plotly.figure_factory as ff
 from tensorflow.keras.callbacks import EarlyStopping
 tfd = tfp.distributions
 
+# Loading dataset
+
 excel=pd.read_excel(r"C:\Users\Francesco\OneDrive\Desktop\progetto icarus\data_bresso.xlsx")
 df=pd.DataFrame(data=excel)
 sns.set(style='darkgrid')
+
+# Deleating units in dataset using str.plit function
+
 
 df['Temperature'] =  (df['Temperature'].str.split(' ', 1).str[0])
 df['Dew Point'] =   (df['Dew Point'].str.split(' ', 1).str[0])
@@ -39,6 +44,8 @@ df['Pressure'] =   (df['Pressure'].str.split(' ', 1).str[0])
 df['Precip. Rate.'] =   (df['Precip. Rate.'].str.split(' ', 1).str[0])
 df['Precip. Accum.'] =   (df['Precip. Accum.'].str.split(' ', 1).str[0])
 df['Solar'] =   (df['Solar'].str.split(' ', 1).str[0])
+
+# The previous function converted dataset into string, so We have to riconvert it in float
 
 df['Temperature'] =  (df['Temperature'].astype(float))
 df['Dew Point'] =   (df['Dew Point'].astype(float))
@@ -50,6 +57,8 @@ df['Precip. Accum.'] =   df['Precip. Accum.'].astype(float)
 df['Solar'] =   df['Solar'].astype(float)
 
 maxx=df.Temperature.max()
+
+# Rescaling dataset from 0 to 1
 df['Temperature']=df['Temperature']/df['Temperature'].max()
 df['Humidity']=df['Humidity']/df['Humidity'].max()
 df['Dew Point']=df['Dew Point']/df['Dew Point'].max()
@@ -60,13 +69,19 @@ df['Precip. Rate.']=df['Precip. Rate.']/df['Precip. Rate.'].max()
 df['Precip. Accum.']=df['Precip. Accum.']/df['Precip. Accum.'].max()
 df['Solar']=df['Solar']/df['Solar'].max()
 
+#Dropping data colums that are useless for the prediction of temperature 
+
 df.drop(columns=['Wind', 'Time', 'Precip. Rate.', 'Precip. Accum.'], axis=1, inplace=True)
 df.dropna(how='any', inplace=True)
+
+# Define the window size, the slide and the number of window called interval
 x=12
 y=48
 y_, x_=[], []
 interval=int((len(df)-(y+2*x))/x)
 interval
+
+# loading data into 11 windows: x_ represent the future features whereas y_ will represent labels(variable that will be predicted)
 
 for i in range(interval):
     y_.append(df.Temperature[x*i:y+x*i])
@@ -85,12 +100,16 @@ y_=np.array(y_)
 x_=np.array(x_)
 x_.shape
 
+# Define the data split into train, valuation ans test set. The splitting is made in terms of windows number
+
 xtrain=np.array(x_[0:9])
 ytrain=np.array(y_[0:9])
 xtest=np.array(x_[10:])
 ytest=np.array(y_[10:])
 xval=np.array(x_[9:10])
 yval=np.array(y_[9:10])
+
+# define the model as a single LSTM layer with 75 nodes and a dropout to avoid overfitting
 
 def LSTM_model_tot(function):
     enco_deco=tf.keras.models.Sequential()
@@ -101,25 +120,37 @@ def LSTM_model_tot(function):
     return enco_deco
 start=time.time()
 
+# compiling the previous model and fitting it in 300 epochs(200 is fine too)
+
 model=LSTM_model_tot('tanh')
 model.compile(optimizer = opt, loss = 'mean_squared_error')
 hist=model.fit(xtrain, ytrain, validation_data=(xval, yval), epochs=300, batch_size=7)
 end=time.time()
 print(end-start, 's')
 
-ypredict=model.predict(xtest)
+# Plotting validation and training loss trend in terms of epochs
 
 plot_history(hist)
 plt.yscale('log')
 plt.ylabel('log(Loss)')
 plt.show()
 
+
+# Generating predictions using test set
+
+ypredict=model.predict(xtest)
+
+# Reshaping predictions and test set from (1, 48) to (40)
 ypredict=np.array(ypredict)
 ypredict=ypredict.reshape(48)
 ytest=ytest.reshape(48)
 
+#computing the error between predictions and test values using RMSE
+
 err=np.sqrt(sklearn.metrics.mean_squared_error(ytest[36:], ypredict[36:]))
 print(err)
+
+# Plotting the predictions and test trend 
 
 x=np.arange(0, 12)
 sns.set(style="darkgrid")
@@ -133,6 +164,7 @@ ax[0].fill_between(x, ypredict[36:]*maxx-err*maxx, ypredict[36:]*maxx+err*maxx, 
 ax[0].grid(True)
 ax[0].legend(['test predictions', 'test values'])
 
+#Plotting the difference trend in terms of time
 
 ax[1].plot(x*5, abs(ytest[36:]-ypredict[36:])*maxx)
 ax[1].set_ylabel('Error [°F]')
@@ -168,14 +200,20 @@ def train(xtrain, ytrain, parameters):
               batch_size=8)
     return model
 
+
+
 def finding_best(search_space, trial):    
     return fmin(fn=hyper_func, space=search_space, algo=tpe.suggest, max_evals=50, trials=trial)
 
+
+#Function to miminize
 def hyper_func(params):
 
     model = train(xtrain, ytrain, params)
     loss = test(model, xtest, ytest)
     return{'loss': loss, 'status': STATUS_OK}
+
+#Hyperparameter space: we want to optimize leraning rate and nodes number
 
 search_space={
               'layer_size':hp.choice('layer_size', np.arange(30, 80, 5)), 
