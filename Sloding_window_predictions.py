@@ -188,7 +188,7 @@ def test(model, xtest, ytest):
 def train(xtrain, ytrain, parameters):
     model=tf.keras.models.Sequential()
     # Encoder
-    model.add(Bidirectional(LSTM(64, activation='tanh', return_sequences=True), input_shape=(48, 7)))
+    model.add(Bidirectional(LSTM(parameters[layer_size], activation='tanh', return_sequences=True), input_shape=(48, 7)))
     model.add(Dropout(0.2))   
     model.add((Dense(units=1)))
     adam=tf.keras.optimizers.Adam(learning_rate=parameters['learning_rate'])
@@ -197,7 +197,7 @@ def train(xtrain, ytrain, parameters):
               ytrain, 
               validation_data=(xval, yval), 
               epochs=300, 
-              batch_size=8)
+              batch_size=parameters['batch_size'])
     return model
 
 
@@ -217,7 +217,8 @@ def hyper_func(params):
 
 search_space={
               'layer_size':hp.choice('layer_size', np.arange(30, 80, 5)), 
-              'learning_rate': hp.uniform('learning_rate', 0.0001, 0.01)
+              'learning_rate': hp.uniform('learning_rate', 0.0001, 0.01), 
+              'batch_size': hp.choice('batch_size', np.arange(4, 11, 2))
               }
               
 trial=Trials()
