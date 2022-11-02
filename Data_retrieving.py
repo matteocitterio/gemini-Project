@@ -16,11 +16,12 @@ of the current day and deleting rows related to 91-days ago or even older data.
 
 """
 
+timespan=90
 today=datetime.today()
-starting_day = today - timedelta(days = 90)
+starting_day = today - timedelta(days = timespan+1)
 print('Program will retrieve data from',starting_day.strftime("%Y-%m-%d"),'to today,',today.strftime("%Y-%m-%d"))
 
-for single_date in (starting_day + timedelta(n) for n in range(91)):
+for single_date in (starting_day + timedelta(n) for n in range(timespan+1)):
 
     print('Doing: ', single_date.strftime("%Y-%m-%d"))
 
@@ -53,8 +54,8 @@ for single_date in (starting_day + timedelta(n) for n in range(91)):
         length = len(mydata)
         mydata.loc[length] = row
 
-    #Doing a bit of cleaning 
-    mydata['Time'] = mydata['Time'].astype(str) +str(single_date.strftime("%Y-%m-%d"))
+    #Doing a bit of cleening 
+    mydata['Time'] = mydata['Time'].astype(str) + ' '+ str(single_date.strftime("%Y-%m-%d"))
     mydata['Humidity']=mydata["Humidity"].str.replace("°","")     
     mydata['Speed']=mydata["Speed"].str.replace("°","")
     mydata['Gust']=mydata["Gust"].str.replace("°","")
@@ -63,12 +64,12 @@ for single_date in (starting_day + timedelta(n) for n in range(91)):
     mydata['Precip. Accum.']=mydata["Precip. Accum."].str.replace("°","")
 
     # if file does not exist write header 
-    if not os.path.isfile('Bresso_weather_data_'+str(single_date.strftime("%Y-%m-%d"))+'.csv'):
-        mydata.to_csv('Bresso_weather_data_'+str(single_date.strftime("%Y-%m-%d"))+'.csv', index=False)
+    if not os.path.isfile('Bresso_updated_'+str(today.strftime("%Y-%m-%d %H-%M"))+'.csv'):
+        mydata.to_csv('Bresso_updated_'+str(today.strftime("%Y-%m-%d %H-%M"))+'.csv', index=False)
     else: # else it exists so append without writing the header
-        mydata.to_csv('Bresso_weather_data_'+str(single_date.strftime("%Y-%m-%d"))+'.csv', mode='a', index=False, header=False)
+        mydata.to_csv('Bresso_updated_'+str(today.strftime("%Y-%m-%d %H-%M"))+'.csv', mode='a', index=False, header=False)
 
     print('Done with: ', str(single_date.strftime("%Y-%m-%d")))
 
-df = pd.read_csv('Bresso_weather_data_'+str(single_date.strftime("%Y-%m-%d"))+'.csv')
+df = pd.read_csv('Bresso_updated_'+str(today.strftime("%Y-%m-%d %H-%M"))+'.csv')
 print(df)
