@@ -53,7 +53,7 @@ for single_date in (starting_day + timedelta(n) for n in range(91)):
         length = len(mydata)
         mydata.loc[length] = row
 
-    #Doing a bit of cleening 
+    #Doing a bit of cleaning 
     mydata['Time'] = mydata['Time'].astype(str) +str(single_date.strftime("%Y-%m-%d"))
     mydata['Humidity']=mydata["Humidity"].str.replace("°","")     
     mydata['Speed']=mydata["Speed"].str.replace("°","")
