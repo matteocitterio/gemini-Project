@@ -46,8 +46,8 @@ def load_data(path_name):
         'Solar',
     ]
 
-    df.dropna(how='any', inplace=True)
     df.drop(columns=['Wind'], axis=1, inplace=True)
+    df.dropna(how='any', inplace=True)
 
     for header in head_list:
         df[header] =  (df[header].str.split().str[0])
