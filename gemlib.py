@@ -47,13 +47,14 @@ def load_data(path_name):
     ]
 
     df.dropna(how='any', inplace=True)
+    df.drop(columns=['Wind'], axis=1, inplace=True)
 
     for header in head_list:
         df[header] =  (df[header].str.split().str[0])
         df[header] =  (df[header].astype(float))
         df[header]=df[header]/df[header].max()
 
-    # df.drop(columns=['Wind','Precip. Rate.', 'Precip. Accum.'], axis=1, inplace=True)
+    
     df.dropna(how='any', inplace=True)
 
     # df.rename(columns={
