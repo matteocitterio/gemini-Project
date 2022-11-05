@@ -14,6 +14,7 @@ import time
 import sklearn
 import seaborn as sns
 import os
+from datetime import datetime, timedelta
 
 def to_celsius(temp):
 
@@ -23,18 +24,22 @@ def to_celsius(temp):
 
     return (temp - 32) * 5/9
 
-
+# Loading dataset
 def load_data(path_name):
     """
     This function loads data into a pd.DataFrame and stripes measure units. Additionally,
-    it converts into [0,1] numbers and drops some columns
-    - path_name: str location of the file
-    return: Pandas.DataFrame
+    it converts into [0,1] numbers and drops some columns.
+    #Params:
+        -) `path_name` : `str` - location of the file
+    #Returns: 
+        -) `df` : `Pandas.DataFrame` - the loaded and striped data
+        -) `max_temp` : `double` - maximum observed temperature used for data normalization
     """
-    df=pd.read_csv(path_name)
 
-    #this stripes out all the measure units
-    head_list=[
+    df = pd.read_csv(path_name)
+
+    # this stripes out all the measure units
+    head_list = [
         'Temperature',
         'Humidity',
         'Dew Point',
@@ -48,31 +53,53 @@ def load_data(path_name):
 
     df.drop(columns=['Wind'], axis=1, inplace=True)
     df.dropna(how='any', inplace=True)
+    max_temp = 0
+
+# Deleating units in dataset using str.plit function
 
     for header in head_list:
-        df[header] =  (df[header].str.split().str[0])
-        df[header] =  (df[header].astype(float))
-        df[header]=df[header]/df[header].max()
+        df[header] = (df[header].str.split().str[0])
+        if (header == 'Temperature'):
+            max_temp = df[header].max()
+        df[header] = (df[header].astype(float))
+        df[header] = df[header]/df[header].max()
 
+    return df, max_temp
+
+def CorrMatrix(data):
+    """
+    Plots an `sns.heatmap` which represents the correlation matrix
+    #Params:
+        -)`data` : `Pandas.DataFrame` - the data used for building the correlation matrix
+    """
+
+    plt.rcParams.update({'font.size': 14})
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax = sns.heatmap(data.corr(), vmin=-1, vmax=1,
+                     cmap="coolwarm",
+                     ax=ax,
+                     annot=True)
+    plt.show()
+
+def GetLastWeekData(df):
+    """
+    This function returns a new dataframe containing only data related to the last week (the lastest 7 days)
+    #Params:
+        -) `df` : `Pandas.Dataframe` - The data you want to reduce
+    #Returns: 
+        -) `ReducedData` : `Pandas.DataFrame` - The reduced dataframe
+    """
+
+    LastAvailableDay = datetime.strptime(
+        df['Time'].str.split().str[2].unique()[-1], "%Y-%m-%d")
+    StartingDay = LastAvailableDay - timedelta(days=7-1)
+    df['Time'] = df['Time'].str.split().str[2]
     
-    df.dropna(how='any', inplace=True)
+    ReducedData = df[df['Time'] >= StartingDay.strftime("%Y-%m-%d")]
 
-    # df.rename(columns={
-    #     'Temperature': 'Temperature[°C]',
-    #     'Dew Point': 'Dew Point[°C]',
-    #     'Humidity': 'Humidity[%]',
-    #     'Speed': 'Speed[kmh]',
-    #     'Gust': 'Gust[kmh]',
-    #     'Pressure': 'Pressure[in]',
-    #     'Precip. Rate.': 'Precip. Rate. [in/hr]',
-    #     'Precip. Accum.': 'Precip. Accum.[in]',
-    #     'Solar': 'Solar [w/m2]'
-    #     }, inplace=True)
-
-    return df
+    return ReducedData
 
 def LSTM_model_tot(input_shape,activation='tanh',dropout=0.2):
-
     """
     Builds an LSTM.keras.model with encoder(?)
     #params:
