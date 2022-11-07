@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*- #
 
+from tokenize import Double
 from gemlib import *
 
 """
@@ -32,7 +33,7 @@ if __name__ == "__main__":
     """
     Reduce dataframe to last 4 days
     """
-    portion = 4
+    portion = 7
     df = GetADataPortion(df,portion)
 
     """
@@ -55,7 +56,7 @@ if __name__ == "__main__":
     ValidationWindowLenght = 48
     TestWindowLenght = 48
  
-    XTrainingSet, XValidationSet, XTestSet, YTrainingSet, YValidationSet, YTestSet = SlidingWindow(df, HourLag, TrainingWindowLenght,
+    XTrainingSet, XValidationSet, XTestSet, YTrainingSet, YValidationSet, YTestSet, NumberOfCreatedWindows = SlidingWindow(df, HourLag, TrainingWindowLenght,
                   ValidationWindowLenght, TestWindowLenght)
 
     """
@@ -69,38 +70,40 @@ if __name__ == "__main__":
     print(YTestSet.shape)
     print(YTrainingSet.shape)
 
-    NumberOfCreatedWindows = XValidationSet.shape[0]
-    print('Number of created windows:', NumberOfCreatedWindows)
-
-
-
-    # xtrain=xtrain.reshape(144, 10, 7)
-    # ytrain=ytrain.reshape(144, 10, 1)
-    # xval=xval.reshape(144, 10, 7)
-    # yval=yval.reshape(144, 10, 1)
-    # xtest=xtest.reshape(144, 10, 7)
-    # xtrain.shape
     # # define the model as a single LSTM layer with 75 nodes and a dropout to avoid overfitting
 
-    # start=time.time()
+    start=time.time()
 
     # # compiling the previous model and fitting it in 76 epochs
-    # model=LSTM_model_tot('tanh')
-    # model.compile(optimizer = opt, loss = 'mean_squared_error')
-    # hist=model.fit(xtrain, ytrain, validation_data=(xval, yval), epochs=76, batch_size=3)
-    # end=time.time()
-    # print(end-start, 's')
+    lr = 0.0055
+    opt = tf.keras.optimizers.Adam(learning_rate=lr)
+
+    model = LSTM_model_tot(input_shape=(
+        NumberOfCreatedWindows, XTrainingSet.shape[2]))
+    model.compile(optimizer = opt, loss = 'mean_squared_error')
+    hist=model.fit(XTrainingSet, YTrainingSet, validation_data=(XValidationSet, YValidationSet), epochs=200, batch_size=3)
+    end=time.time()
+    print(end-start, 's')
 
 
-    # # Plotting validation and training loss trend in terms of epochs
-    # plot_history(hist)
-    # plt.yscale('log')
-    # plt.ylabel('log(Loss)')
+    # Plotting validation and training loss trend in terms of epochs
+    plot_history(hist)
+    plt.yscale('log')
+    plt.ylabel('log(Loss)')
     # plt.show()
 
     # # Generating predictions using test set
 
-    # ypredict=model.predict(xtest)
+    YPredicted=model.predict(XTestSet)
+    # print(YPredicted)
+    
+    YPredicted = YPredicted.reshape(NumberOfCreatedWindows, TestWindowLenght , 1)
+    YTestSet = YTestSet.reshape(NumberOfCreatedWindows, TestWindowLenght, 1)
+
+    # print(YPredicted.shape)
+
+    # print(YPredicted[0][:])
+    # print(YPredicted[0][:].shape)
 
     # # Reshaping predictions and test set from (1, 48) to (40)
     # ypredict=ypredict.reshape(1, 10, 144)
@@ -108,33 +111,52 @@ if __name__ == "__main__":
     # ytest=ytest.reshape(144)
 
     # #computing the error between predictions and test values using RMSE
+    err=[]
+    for i in range(0, NumberOfCreatedWindows):
 
-    # err=np.sqrt(sklearn.metrics.mean_squared_error(ytest[120:], ypredict[0][9][120:]))
-    # print(err)
+        err.append(np.sqrt(mean_squared_error(YPredicted[i][:], YTestSet[i][:])))
+    
 
     # # Plotting the predictions and test trend 
 
-    # x=np.arange(0, 24)
-    # sns.set(style="darkgrid")
-    # fig, ax = plt.subplots(1, 2, figsize=(20, 8))
+    temp_pred = np.asarray(YPredicted[100][:])
+    temp_test = np.asarray(YTestSet[100][:])
+    temp_pred.reshape(TestWindowLenght)
+    temp_test.reshape(TestWindowLenght)
 
-    # ax[0].plot(x*5, ypredict[0][9][120:]*maxx, color='b')
-    # ax[0].plot(x*5, ytest[120:]*maxx, color='r')
-    # ax[0].set_xlabel("Time",fontsize=15)
-    # ax[0].set_ylabel("Temperature",fontsize=15)
-    # ax[0].fill_between(x*5, ypredict[0][9][120:]*maxx-err*maxx, ypredict[0][9][120:]*maxx+err*maxx, alpha=0.3)
-    # ax[0].grid(True)
-    # ax[0].legend(['test predictions', 'test values'])
+    print(temp_pred.shape)
+
+    x=np.arange(0, 48)
+    sns.set(style="darkgrid")
+    fig, ax = plt.subplots(1, 2, figsize=(20, 8))
+
+    ax[0].plot(x, temp_pred * max_temp, color='b')
+    ax[0].plot(x, temp_test * max_temp, color='r')
+    ax[0].set_xlabel("Time",fontsize=15)
+    ax[0].set_ylabel("Temperature",fontsize=15)
+    # ax[0].fill_between(x, temp_pred * max_temp - err[0] * max_temp, temp_pred * max_temp + err * max_temp, alpha=0.3)
+    ax[0].grid(True)
+    ax[0].legend(['test predictions', 'test values'])
+    ax[0].set_title('Example of a prediction - window #1')
+
+    ax[1].plot(x, abs(temp_test - temp_pred) * max_temp)
+    ax[1].set_ylabel('Error [°F]')
+    ax[1].set_xlabel('Time [min]')
+    ax[1].legend(['Last hour perdictions'])
+
+    x = np.arange(0, NumberOfCreatedWindows)
+
+    sns.set(style="darkgrid")
+    fig, ax = plt.subplots(1, 1, figsize=(20, 8))
+
+    ax.plot(x, err, c='orange')
+    ax.set_xlabel("#Window", fontsize=15)
+    ax.set_ylabel("MSD", fontsize=15)
+    ax.grid(True)
+    ax.set_title('Windows error')
 
 
-
-    # ax[1].plot(x*5, abs(ytest[120:]-ypredict[0][9][120:])*maxx)
-    # ax[1].set_ylabel('Error [°F]')
-    # ax[1].set_xlabel('Time [min]')
-    # ax[1].legend(['Last hour perdictions'])
-
-
-    # plt.show()
+    plt.show()
     
     # #HYPERPARAMETER OPTIMIZATION
     # def test(model, xtest, ytest):
