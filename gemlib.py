@@ -81,23 +81,79 @@ def CorrMatrix(data):
                      annot=True)
     plt.show()
 
-def GetLastWeekData(df):
+def GetADataPortion(data, portion):
     """
     This function returns a new dataframe containing only data related to the last week (the lastest 7 days)
     #Params:
-        -) `df` : `Pandas.Dataframe` - The data you want to reduce
+        -) `data` : `Pandas.Dataframe` - The data you want to reduce
+        -) `portion` : `int` - Number of days you want to reduce your dataset to
     #Returns: 
         -) `ReducedData` : `Pandas.DataFrame` - The reduced dataframe
     """
 
     LastAvailableDay = datetime.strptime(
-        df['Time'].str.split().str[2].unique()[-1], "%Y-%m-%d")
-    StartingDay = LastAvailableDay - timedelta(days=7-1)
-    df['Time'] = df['Time'].str.split().str[2]
-    
-    ReducedData = df[df['Time'] >= StartingDay.strftime("%Y-%m-%d")]
+        data['Time'].str.split().str[2].unique()[-1], "%Y-%m-%d")
+    StartingDay = LastAvailableDay - timedelta(days=portion-1)
+
+    ReducedData = data[data['Time'].str.split().str[2] >= StartingDay.strftime("%Y-%m-%d")]
+    ReducedData = ReducedData.reset_index()
+    ReducedData.drop(columns=['index'], inplace=True)
 
     return ReducedData
+
+
+def SlidingWindow(df, HourLag, TrainingWindowLenght, ValidationWindowLenght, TestWindowLenght):
+    """
+    Executes the sliding of data returning the maximum amount of windows given the dataframe
+    #PARAMS:
+        -) `df` : `Pandas.Dataframe` - The data you want to slice
+        -) `HourLag` : `int` -  number of points corrisponding of the our lag. E.g for an hour lag we need 12 
+                                points
+        -) `TrainingWindowLenght` - `int` - number of points for each training window
+        -) `ValidationWindowLenght` - `int` - number of points for each val window
+        -) `TestWindowLenght` - `int` - number of points for each test window
+
+    #RETURNS:
+
+        -) X and Y arrays as traninig-val-test data
+
+    """
+
+    XTrainingSet, XValidationSet, XTestSet = [], [], []
+    YTrainingSet, YValidationSet, YTestSet = [], [], []
+
+    StartingIndex = len(df) - ValidationWindowLenght - TestWindowLenght
+    HeadersNoTempTime = [x for x in df.columns if not x in ['Temperature','Time']]
+    print('Headers used for training: ',HeadersNoTempTime)
+
+    while (StartingIndex - TrainingWindowLenght >= 0):
+
+        YTrainingSet.append(
+            df['Temperature'][StartingIndex-TrainingWindowLenght:StartingIndex])
+        YValidationSet.append(
+            df['Temperature'][StartingIndex:StartingIndex+ValidationWindowLenght])
+        YTestSet.append(df['Temperature']
+                        [StartingIndex+ValidationWindowLenght:])
+
+        XTrainingSet.append(
+            df[HeadersNoTempTime][StartingIndex-TrainingWindowLenght:StartingIndex])
+        XValidationSet.append(
+            df[HeadersNoTempTime][StartingIndex:StartingIndex+ValidationWindowLenght])
+        XTestSet.append(df[HeadersNoTempTime][StartingIndex+ValidationWindowLenght:])
+
+        df.drop(df.tail(HourLag).index, inplace=True)
+        StartingIndex = StartingIndex-HourLag
+
+
+    XValidationSet = np.asarray(XValidationSet)
+    XTrainingSet = np.asarray(XTrainingSet)
+    XTestSet = np.asarray(XTestSet)
+    YTrainingSet = np.asarray(YTrainingSet)
+    YValidationSet = np.asarray(YValidationSet)
+    YTestSet = np.asarray(YTestSet)
+
+    return XTrainingSet, XValidationSet, XTestSet, YTrainingSet, YValidationSet, YTestSet
+    
 
 def LSTM_model_tot(input_shape,activation='tanh',dropout=0.2):
     """
