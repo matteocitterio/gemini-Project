@@ -11,7 +11,7 @@ from hyperopt import hp, tpe, Trials, fmin
 from tensorflow.keras.layers import Dense, Flatten
 from hyperopt import fmin, tpe, hp, Trials, space_eval, STATUS_OK
 import time
-import sklearn
+from sklearn.metrics import mean_squared_error
 import seaborn as sns
 import os
 from datetime import datetime, timedelta
@@ -64,7 +64,7 @@ def load_data(path_name):
         df[header] = (df[header].astype(float))
         df[header] = df[header]/df[header].max()
 
-    return df, max_temp
+    return df, float(max_temp)
 
 def CorrMatrix(data):
     """
@@ -116,6 +116,7 @@ def SlidingWindow(df, HourLag, TrainingWindowLenght, ValidationWindowLenght, Tes
     #RETURNS:
 
         -) X and Y arrays as traninig-val-test data
+        -) `Number of created windows` - `int` - Number of generated windows
 
     """
 
@@ -152,7 +153,16 @@ def SlidingWindow(df, HourLag, TrainingWindowLenght, ValidationWindowLenght, Tes
     YValidationSet = np.asarray(YValidationSet)
     YTestSet = np.asarray(YTestSet)
 
-    return XTrainingSet, XValidationSet, XTestSet, YTrainingSet, YValidationSet, YTestSet
+    NumberOfCreatedWindows = XValidationSet.shape[0]
+
+    XTrainingSet=XTrainingSet.reshape(TrainingWindowLenght, NumberOfCreatedWindows, 9)
+    YTrainingSet=YTrainingSet.reshape(TrainingWindowLenght, NumberOfCreatedWindows, 1)
+    XValidationSet=XValidationSet.reshape(ValidationWindowLenght, NumberOfCreatedWindows, 9)
+    YValidationSet=YValidationSet.reshape(ValidationWindowLenght, NumberOfCreatedWindows, 1)
+    XTestSet=XTestSet.reshape(TestWindowLenght, NumberOfCreatedWindows, 9)
+    YTestSet=YTestSet.reshape(TestWindowLenght,NumberOfCreatedWindows,1)
+
+    return XTrainingSet, XValidationSet, XTestSet, YTrainingSet, YValidationSet, YTestSet , NumberOfCreatedWindows
     
 
 def LSTM_model_tot(input_shape,activation='tanh',dropout=0.2):
@@ -165,6 +175,8 @@ def LSTM_model_tot(input_shape,activation='tanh',dropout=0.2):
 
     return: it returns the model
     """
+
+    print(input_shape)
 
     enco_deco=tf.keras.models.Sequential()
     enco_deco.add(Bidirectional(LSTM(75, activation=activation, return_sequences=True), input_shape=input_shape))
